@@ -26,74 +26,158 @@ cd ~
 wget https://dev.mysql.com/get/Downloads/Connector-J/mysql-connector-j-8.3.0.tar.gz
 tar -xzf mysql-connector-j-8.3.0.tar.gz
 
-# 💾 STEP 6: Create Java program file
+# 📥 STEP 6: Create the javacrud Database
+
+mysql -h <your-rds-endpoint> -u admin -p
+
+# 📥 STEP 7: Create the database:
+
+CREATE DATABASE javacrud;
+USE javacrud;
+
+CREATE TABLE employees (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(100),
+  email VARCHAR(150),
+  country VARCHAR(50),
+  salary DOUBLE
+
+//
+  exit from mysql
+
+# 💾 STEP 8: Create Java program file
 nano JdbcCrudDemo.java
 
-
+//paste code in JdbcCrudDemo.java
 import java.sql.*;
+import java.util.Scanner;
 
 public class JdbcCrudDemo {
-    static final String JDBC_URL = "jdbc:mysql://<your-rds-endpoint>:3306/javacrud";
+    static final String JDBC_URL = "jdbc:mysql://admin.cta22msygp0l.ap-south-1.rds.amazonaws.com:3306/javacrud";
     static final String JDBC_USER = "admin";
-    static final String JDBC_PASS = "yourpassword";
+    static final String JDBC_PASS = "Jaisriram7$";
 
     public static void main(String[] args) {
-        try {
-            Class.forName("com.mysql.cj.jdbc.Driver");
+        try (
             Connection conn = DriverManager.getConnection(JDBC_URL, JDBC_USER, JDBC_PASS);
+            Scanner scanner = new Scanner(System.in)
+        ) {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+            int choice;
 
-            // INSERT
-            String insertSql = "INSERT INTO employees (name, email, country, salary) VALUES (?, ?, ?, ?)";
-            PreparedStatement insertStmt = conn.prepareStatement(insertSql);
-            insertStmt.setString(1, "Alice");
-            insertStmt.setString(2, "alice@example.com");
-            insertStmt.setString(3, "USA");
-            insertStmt.setDouble(4, 50000);
-            insertStmt.executeUpdate();
-            System.out.println("Inserted new employee.");
+            do {
+                System.out.println("\n=== Employee CRUD Menu ===");
+                System.out.println("1. Insert Employee");
+                System.out.println("2. View All Employees");
+                System.out.println("3. Update Employee Salary");
+                System.out.println("4. Delete Employee");
+                System.out.println("5. Exit");
+                System.out.print("Enter your choice: ");
+                choice = scanner.nextInt();
+                scanner.nextLine(); // consume newline
 
-            // SELECT
-            String selectSql = "SELECT * FROM employees";
-            Statement selectStmt = conn.createStatement();
-            ResultSet rs = selectStmt.executeQuery(selectSql);
-            System.out.println("Employee List:");
-            while (rs.next()) {
-                System.out.println(
-                    rs.getInt("id") + ", " +
-                    rs.getString("name") + ", " +
-                    rs.getString("email") + ", " +
-                    rs.getString("country") + ", " +
-                    rs.getDouble("salary")
-                );
-            }
+                switch (choice) {
+                    case 1:
+                        insertEmployee(conn, scanner);
+                        break;
+                    case 2:
+                        viewEmployees(conn);
+                        break;
+                    case 3:
+                        updateSalary(conn, scanner);
+                        break;
+                    case 4:
+                        deleteEmployee(conn, scanner);
+                        break;
+                    case 5:
+                        System.out.println("Exiting...");
+                        break;
+                    default:
+                        System.out.println("Invalid choice. Try again.");
+                }
+            } while (choice != 5);
 
-            // UPDATE
-            String updateSql = "UPDATE employees SET salary = ? WHERE name = ?";
-            PreparedStatement updateStmt = conn.prepareStatement(updateSql);
-            updateStmt.setDouble(1, 60000);
-            updateStmt.setString(2, "Alice");
-            updateStmt.executeUpdate();
-            System.out.println("Updated salary for Alice.");
-
-            // DELETE
-            String deleteSql = "DELETE FROM employees WHERE name = ?";
-            PreparedStatement deleteStmt = conn.prepareStatement(deleteSql);
-            deleteStmt.setString(1, "Alice");
-            deleteStmt.executeUpdate();
-            System.out.println("Deleted employee Alice.");
-
-            // Cleanup
-            deleteStmt.close();
-            updateStmt.close();
-            rs.close();
-            selectStmt.close();
-            insertStmt.close();
-            conn.close();
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
+
+    private static void insertEmployee(Connection conn, Scanner scanner) throws SQLException {
+        System.out.print("Enter name: ");
+        String name = scanner.nextLine();
+
+        System.out.print("Enter email: ");
+        String email = scanner.nextLine();
+
+        System.out.print("Enter country: ");
+        String country = scanner.nextLine();
+
+        System.out.print("Enter salary: ");
+        double salary = scanner.nextDouble();
+
+        String sql = "INSERT INTO employees (name, email, country, salary) VALUES (?, ?, ?, ?)";
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, name);
+            stmt.setString(2, email);
+            stmt.setString(3, country);
+            stmt.setDouble(4, salary);
+            stmt.executeUpdate();
+            System.out.println("Employee inserted successfully.");
+        }
+    }
+
+    private static void viewEmployees(Connection conn) throws SQLException {
+        String sql = "SELECT * FROM employees";
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+            System.out.println("\n=== Employee List ===");
+            while (rs.next()) {
+                System.out.printf("ID: %d | Name: %s | Email: %s | Country: %s | Salary: %.2f\n",
+                    rs.getInt("id"), rs.getString("name"), rs.getString("email"),
+                    rs.getString("country"), rs.getDouble("salary"));
+            }
+        }
+    }
+
+    private static void updateSalary(Connection conn, Scanner scanner) throws SQLException {
+        System.out.print("Enter employee name to update: ");
+        String name = scanner.nextLine();
+
+        System.out.print("Enter new salary: ");
+        double salary = scanner.nextDouble();
+
+        String sql = "UPDATE employees SET salary = ? WHERE name = ?";
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setDouble(1, salary);
+            stmt.setString(2, name);
+            int rows = stmt.executeUpdate();
+            if (rows > 0) {
+                System.out.println("Salary updated.");
+            } else {
+                System.out.println("Employee not found.");
+            }
+        }
+    }
+
+    private static void deleteEmployee(Connection conn, Scanner scanner) throws SQLException {
+        System.out.print("Enter employee name to delete: ");
+        String name = scanner.nextLine();
+
+        String sql = "DELETE FROM employees WHERE name = ?";
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, name);
+            int rows = stmt.executeUpdate();
+            if (rows > 0) {
+                System.out.println("Employee deleted.");
+            } else {
+                System.out.println("Employee not found.");
+            }
+        }
+    }
 }
+
+
+  
 
 
 # 📦 STEP 7: Compile the Java file
